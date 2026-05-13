@@ -1,6 +1,6 @@
 # Copilot Profile Manager
 
-Copilot Profile Manager is a **WinUI 3** Windows desktop app for managing **GitHub Copilot CLI** profiles stored in **Windows Terminal** settings, syncing them to **Windows Terminal Preview** when installed, and publishing matching **Explorer context-menu** entries.
+Copilot Profile Manager is a **WinUI 3** Windows desktop app for managing **GitHub Copilot CLI** profiles stored in **Windows Terminal** settings, syncing them to **Windows Terminal Preview** when installed, and publishing matching **classic Explorer context-menu** entries.
 
 ## What it does
 
@@ -10,7 +10,7 @@ Copilot Profile Manager is a **WinUI 3** Windows desktop app for managing **GitH
 - splits the profile command into a **shell command prefix** and **Copilot CLI flags**
 - reads `copilot --help` and exposes the CLI options in the UI for easier flag insertion
 - syncs managed profiles back to Windows Terminal and/or Windows Terminal Preview
-- writes a per-user `Copilot` submenu to Explorer for:
+- writes a per-user `Copilot` classic submenu to Explorer for:
   - right-clicking a folder
   - right-clicking the background inside a folder
 
@@ -20,7 +20,7 @@ The app now makes the sync targets explicit:
 
 - **Windows Terminal (stable)** means the profile is written to the regular Windows Terminal `settings.json`
 - **Windows Terminal Preview** means the profile is written to the Preview build's `settings.json`
-- **Explorer submenu** means the classic right-click `Copilot` submenu is created or removed
+- **Classic Explorer submenu** means the classic right-click `Copilot` submenu is created or removed
 
 The app also shows the actual settings-file paths so it is obvious which install each checkbox maps to.
 
@@ -55,12 +55,14 @@ This MVP writes classic registry-backed context menu entries under:
 
 That means it works without elevation, but on Windows 11 it still lands under **Show more options**.
 
+If you run the app with **package identity** during development, the classic `HKCU\Software\Classes` writes can be redirected into the app package's private registry view instead of the real Explorer hive. In that case you will not see the keys under the usual RegEdit path and Explorer will not pick them up. Use the published unpackaged build (`dotnet publish ... -p:WindowsPackageType=None`) to test the classic Explorer integration end to end.
+
 ## Removing the Explorer menu
 
 You have two ways to remove the registry integration:
 
 1. In the app, click **Remove Explorer menu now**
-2. Or uncheck **Explorer submenu** for every profile and save
+2. Or uncheck **Classic Explorer submenu** for every profile and save
 
 The app writes the menu under `HKCU`, so removal is per-user and does not require elevation.
 

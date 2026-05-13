@@ -100,15 +100,23 @@ public partial class MainPageViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsBusy { get; set; }
 
+    [ObservableProperty]
+    public partial string ExplorerIntegrationDescription { get; set; } =
+        "Adds or removes the classic Explorer submenu for folders and folder backgrounds. On Windows 11 it appears under Show more options.";
+
     public async Task LoadAsync()
     {
         try
         {
             IsBusy = true;
+            var hasPackageIdentity = RuntimeEnvironmentService.HasPackageIdentity();
             metadata = metadataService.Load();
             locations = terminalSettingsService.DiscoverLocations().ToList();
             stableInstalled = locations.Any(location => location.Key == "stable" && location.IsInstalled);
             previewInstalled = locations.Any(location => location.Key == "preview" && location.IsInstalled);
+            ExplorerIntegrationDescription = hasPackageIdentity
+                ? "Adds or removes the classic Explorer submenu for folders and folder backgrounds. This run has package identity, so Explorer registry writes are redirected into the app package and will not appear in the real Explorer menu or under HKCU\\Software\\Classes in RegEdit. Use the published unpackaged build to test Explorer integration."
+                : "Adds or removes the classic Explorer submenu for folders and folder backgrounds. On Windows 11 it appears under Show more options.";
 
             var snapshots = locations
                 .Where(location => location.IsInstalled)
@@ -139,6 +147,11 @@ public partial class MainPageViewModel : ObservableObject
             if (SelectedProfile is null)
             {
                 ClearEditor();
+            }
+
+            if (hasPackageIdentity)
+            {
+                Log("Detected package identity. Explorer registry writes are redirected into the app package, so the classic menu will not appear in the real Explorer context menu during this run.");
             }
 
             Log($"Loaded {Profiles.Count} Copilot profile(s).");
@@ -326,7 +339,21 @@ public partial class MainPageViewModel : ObservableObject
                 Log($"Synced {desiredProfiles.Count} profile(s) to {location.DisplayName}.");
             }
 
-            registrySyncService.SyncProfiles(Profiles);
+            if (RuntimeEnvironmentService.HasPackageIdentity())
+            {
+                Log("Detected package identity before Explorer sync. Registry writes will be virtualized and won't show up in the real Explorer menu or the standard HKCU\\Software\\Classes view.");
+            }
+
+            try
+            {
+                registrySyncService.SyncProfiles(Profiles);
+            }
+            catch (Exception ex)
+            {
+                Log($"Explorer registry sync failed: {ex.GetType().Name}: {ex.Message}");
+                throw;
+            }
+
             Log(Profiles.Any(profile => profile.SyncRegistry)
                 ? "Updated Explorer registry menu."
                 : "Explorer registry menu removed.");
