@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "CopilotProfileManager.WinUI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "CopilotProfileManager.WinUI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

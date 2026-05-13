@@ -1,12 +1,12 @@
 # Copilot Profile Manager
 
-Copilot Profile Manager is a Windows desktop app for managing **GitHub Copilot CLI** profiles stored in **Windows Terminal** settings, syncing them to **Windows Terminal Preview** when installed, and publishing matching **Explorer context-menu** entries.
+Copilot Profile Manager is a **WinUI 3** Windows desktop app for managing **GitHub Copilot CLI** profiles stored in **Windows Terminal** settings, syncing them to **Windows Terminal Preview** when installed, and publishing matching **Explorer context-menu** entries.
 
 ## What it does
 
 - discovers Windows Terminal stable and Preview `settings.json` files
 - loads Copilot-related Terminal profiles and merges them by **GUID**
-- lets you create, clone, edit, and delete profiles in a WinForms UI
+- lets you create, clone, edit, and delete profiles in a WinUI 3 desktop UI
 - splits the profile command into a **shell command prefix** and **Copilot CLI flags**
 - reads `copilot --help` and exposes the CLI options in the UI for easier flag insertion
 - syncs managed profiles back to Windows Terminal and/or Windows Terminal Preview
@@ -32,18 +32,19 @@ wt.exe --profile "{profile-guid}" -d "<selected directory>"
 
 Using the profile **GUID** instead of the profile name means renames do not break the shell integration.
 
-## Why C# WinForms?
+## Why C# and WinUI 3?
 
-F# would absolutely be a fun choice for the domain logic, but for a practical first pass this app is built in **C# WinForms** so the Windows UI and registry integration stay straightforward. If the project grows, it would be reasonable to move the sync/domain code into a separate class library and revisit F# there.
+F# would still be a fun option for the domain layer, but the current app is built in **C# with WinUI 3** so it can use a modern Windows desktop UI without losing the existing Terminal and registry integration. If the project grows, it would still be reasonable to move the sync/domain code into a separate class library and revisit F# there.
 
 ## Current architecture
 
-- `src/CopilotProfileManager.App/MainForm.cs` — WinForms UI
-- `src/CopilotProfileManager.App/Models` — profile, CLI option, metadata, and Terminal location models
-- `src/CopilotProfileManager.App/Services/WindowsTerminalSettingsService.cs` — Windows Terminal discovery and DOM-based JSON merge/upsert
-- `src/CopilotProfileManager.App/Services/RegistrySyncService.cs` — per-user Explorer submenu writer
-- `src/CopilotProfileManager.App/Services/CopilotCliService.cs` — `copilot --help` inspection and flag parsing
-- `src/CopilotProfileManager.App/Services/AppMetadataService.cs` — app-managed profile tracking for safe removals
+- `src/CopilotProfileManager.WinUI\App.xaml`, `MainWindow.xaml`, and `MainPage.xaml` — WinUI 3 shell and main application UI
+- `src/CopilotProfileManager.WinUI\ViewModels\MainPageViewModel.cs` — orchestration layer for loading, editing, saving, and syncing profiles
+- `src/CopilotProfileManager.WinUI\Models` — profile, CLI option, metadata, and Terminal location models
+- `src/CopilotProfileManager.WinUI\Services\WindowsTerminalSettingsService.cs` — Windows Terminal discovery and DOM-based JSON merge/upsert
+- `src/CopilotProfileManager.WinUI\Services\RegistrySyncService.cs` — per-user Explorer submenu writer
+- `src/CopilotProfileManager.WinUI\Services\CopilotCliService.cs` — `copilot --help` inspection and flag parsing
+- `src/CopilotProfileManager.WinUI\Services\AppMetadataService.cs` — app-managed profile tracking for safe removals
 
 ## Explorer integration notes
 
@@ -88,6 +89,12 @@ That is feasible in a production application, but it is a meaningfully bigger st
 
 ```powershell
 dotnet build .\CopilotProfileManager.slnx
+```
+
+## Release publish
+
+```powershell
+dotnet publish .\src\CopilotProfileManager.WinUI\CopilotProfileManager.WinUI.csproj --configuration Release --runtime win-x64 --self-contained false -p:WindowsPackageType=None -p:PublishSingleFile=false -o .\artifacts\publish\win-x64
 ```
 
 ## Roadmap ideas
