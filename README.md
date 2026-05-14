@@ -63,7 +63,7 @@ The repository already contains the core command implementation for a future mod
 - the shell-launch logic is shared in the core library
 - `CopilotProfileManager.Shell` contains the dynamic submenu model, COM interfaces, root/leaf `IExplorerCommand` implementations, class factory, and NativeAOT DLL export scaffolding
 
-Pull requests publish the shell project with NativeAOT on `windows-latest` and validate that the generated package manifest includes the COM server and `Directory` / `Directory\Background` Explorer registrations.
+Pull requests publish the shell project with NativeAOT on `windows-latest`, sign an installable MSIX test layout with a self-signed certificate, and validate that the generated package manifest includes the COM server and `Directory` / `Directory\Background` Explorer registrations.
 
 Tagged releases now ship two Windows artifacts:
 
@@ -86,7 +86,7 @@ dotnet publish .\src\CopilotProfileManager.Shell\CopilotProfileManager.Shell.csp
 
 If you are packaging the shell output into an Explorer-integrated package and then update that package, Explorer may continue holding onto the previous shell extension until it refreshes. If the updated command does not appear immediately, restart Explorer (or sign out/in) after the package update.
 
-To install the packaged release, extract the MSIX zip from the GitHub release and run `Install.ps1`. The package uses a self-signed certificate, so Windows may prompt to trust the included `.cer` file during installation.
+To install the packaged release or PR artifact, extract the layout zip/artifact and run `Install.ps1`. The package uses a self-signed certificate, so Windows may prompt to trust the included `.cer` file during installation.
 
 ## Removing the Explorer menu
 
