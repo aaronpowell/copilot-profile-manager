@@ -111,6 +111,11 @@ public partial class MainPageViewModel : ObservableObject
             IsBusy = true;
             var hasPackageIdentity = RuntimeEnvironmentService.HasPackageIdentity();
             metadata = metadataService.Load();
+            if (metadata.ExplorerProfileGuids.Count == 0 && metadata.ManagedProfileGuids.Count > 0)
+            {
+                metadata.ExplorerProfileGuids = [.. metadata.ManagedProfileGuids];
+            }
+
             locations = terminalSettingsService.DiscoverLocations().ToList();
             stableInstalled = locations.Any(location => location.Key == "stable" && location.IsInstalled);
             previewInstalled = locations.Any(location => location.Key == "preview" && location.IsInstalled);
@@ -362,6 +367,10 @@ public partial class MainPageViewModel : ObservableObject
                 .Where(profile => profile.HasAnySyncTarget())
                 .Select(profile => profile.Guid)
                 .ToHashSet();
+            metadata.ExplorerProfileGuids = Profiles
+                .Where(profile => profile.SyncRegistry)
+                .Select(profile => profile.Guid)
+                .ToHashSet();
 
             metadataService.Save(metadata);
             deletedProfileGuids.Clear();
@@ -426,11 +435,11 @@ public partial class MainPageViewModel : ObservableObject
                 {
                     existing.SyncStable |= profile.SyncStable;
                     existing.SyncPreview |= profile.SyncPreview;
-                    existing.SyncRegistry |= metadata.ManagedProfileGuids.Contains(profile.Guid);
+                    existing.SyncRegistry |= metadata.ExplorerProfileGuids.Contains(profile.Guid);
                     continue;
                 }
 
-                profile.SyncRegistry = metadata.ManagedProfileGuids.Contains(profile.Guid);
+                profile.SyncRegistry = metadata.ExplorerProfileGuids.Contains(profile.Guid);
                 byGuid[profile.Guid] = profile;
             }
         }

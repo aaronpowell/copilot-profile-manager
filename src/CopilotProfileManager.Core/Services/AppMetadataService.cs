@@ -13,13 +13,18 @@ public sealed class AppMetadataService
     private readonly string metadataPath;
 
     public AppMetadataService()
+        : this(null)
     {
-        var appDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "CopilotProfileManager");
-
-        metadataPath = Path.Combine(appDataPath, "managed-profiles.json");
     }
+
+    public AppMetadataService(string? metadataPath)
+    {
+        this.metadataPath = string.IsNullOrWhiteSpace(metadataPath)
+            ? GetDefaultMetadataPath()
+            : metadataPath;
+    }
+
+    public string MetadataPath => metadataPath;
 
     public ProfileMetadata Load()
     {
@@ -36,5 +41,14 @@ public sealed class AppMetadataService
     {
         Directory.CreateDirectory(Path.GetDirectoryName(metadataPath)!);
         File.WriteAllText(metadataPath, JsonSerializer.Serialize(metadata, JsonOptions));
+    }
+
+    private static string GetDefaultMetadataPath()
+    {
+        var appDataPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "CopilotProfileManager");
+
+        return Path.Combine(appDataPath, "managed-profiles.json");
     }
 }
