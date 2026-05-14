@@ -6,6 +6,10 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      SHELL_PUBLISH_DIR: ${{ github.workspace }}\artifacts\shell\win-x64
+      SHELL_DLL_PATH: ${{ github.workspace }}\artifacts\shell\win-x64\CopilotProfileManager.Shell.dll
+      PACKAGE_OUTPUT_DIR: ${{ github.workspace }}\artifacts\package\
 
     steps:
       - name: Checkout
@@ -20,5 +24,174 @@ jobs:
       - name: Restore
         run: dotnet restore .\CopilotProfileManager.slnx
 
+      - name: Resolve package version
+        shell: pwsh
+        run: |
+          $packageVersion = dotnet msbuild .\src\CopilotProfileManager.WinUI\CopilotProfileManager.WinUI.csproj -getProperty:AppVersion -nologo
+          if ([string]::IsNullOrWhiteSpace($packageVersion)) {
+              throw 'MSBuild did not return AppVersion.'
+          }
+
+          "PACKAGE_VERSION=$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Build
         run: dotnet build .\CopilotProfileManager.slnx --configuration Release --no-restore
+
+      - name: Publish shell extension
+        run: >
+          dotnet publish .\src\CopilotProfileManager.Shell\CopilotProfileManager.Shell.csproj
+          --configuration Release
+          --runtime win-x64
+          --no-restore
+          -p:Version=${{ env.PACKAGE_VERSION }}
+          -p:FileVersion=${{ env.PACKAGE_VERSION }}
+          -p:AssemblyVersion=${{ env.PACKAGE_VERSION }}
+          -p:InformationalVersion=${{ env.PACKAGE_VERSION }}
+          -o "${{ env.SHELL_PUBLISH_DIR }}"
+
+      - name: Build unsigned package with shell manifest
+        run: >
+          dotnet msbuild .\src\CopilotProfileManager.WinUI\CopilotProfileManager.WinUI.csproj
+          /restore
+          /p:Configuration=Release
+          /p:Platform=x64
+          /p:RuntimeIdentifier=win-x64
+          /p:GenerateAppxPackageOnBuild=true
+          /p:AppxBundle=Never
+          /p:UapAppxPackageBuildMode=SideloadOnly
+          /p:AppxPackageDir=${{ env.PACKAGE_OUTPUT_DIR }}
+          /p:AppxPackageSigningEnabled=false
+          /p:AppxPackageVersion=${{ env.PACKAGE_VERSION }}
+          /p:PackageManifestVersion=${{ env.PACKAGE_VERSION }}
+          /p:Version=${{ env.PACKAGE_VERSION }}
+          /p:FileVersion=${{ env.PACKAGE_VERSION }}
+          /p:AssemblyVersion=${{ env.PACKAGE_VERSION }}
+          /p:InformationalVersion=${{ env.PACKAGE_VERSION }}
+          /p:IncludeShellExtensionManifest=true
+          /p:ShellExtensionArtifactPath=${{ env.SHELL_DLL_PATH }}
+
+      - name: Normalize package versioned names
+        shell: pwsh
+        run: |
+          $packageLayout = Get-ChildItem `
+              -Path $env:PACKAGE_OUTPUT_DIR `
+              -Directory `
+            | Sort-Object LastWriteTime -Descending `
+            | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $packageLayout) {
+              throw "Expected a packaged test layout under $($env:PACKAGE_OUTPUT_DIR)."
+          }
+
+          $expectedLayoutName = "CopilotProfileManager.WinUI_$($env:PACKAGE_VERSION)_x64_Test"
+          $expectedLayoutPath = Join-Path $env:PACKAGE_OUTPUT_DIR $expectedLayoutName
+          if ($packageLayout -ne $expectedLayoutPath) {
+              if (Test-Path $expectedLayoutPath) {
+                  Remove-Item -Recurse -Force $expectedLayoutPath
+              }
+
+              Rename-Item -Path $packageLayout -NewName $expectedLayoutName
+              $packageLayout = $expectedLayoutPath
+          }
+
+          $msixPath = Get-ChildItem `
+              -Path $packageLayout `
+              -Filter *.msix `
+            | Sort-Object LastWriteTime -Descending `
+            | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $msixPath) {
+              throw "Expected a packaged MSIX under $packageLayout."
+          }
+
+          $expectedMsixName = "CopilotProfileManager.WinUI_$($env:PACKAGE_VERSION)_x64.msix"
+          $expectedMsixPath = Join-Path $packageLayout $expectedMsixName
+          if ($msixPath -ne $expectedMsixPath) {
+              if (Test-Path $expectedMsixPath) {
+                  Remove-Item -Force $expectedMsixPath
+              }
+
+              Rename-Item -Path $msixPath -NewName $expectedMsixName
+          }
+
+      - name: Validate packaged shell manifest
+        shell: pwsh
+        run: |
+          $packageLayout = Get-ChildItem `
+              -Path $env:PACKAGE_OUTPUT_DIR `
+              -Directory `
+            | Sort-Object LastWriteTime -Descending `
+            | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $packageLayout) {
+              throw "Expected a packaged test layout under $($env:PACKAGE_OUTPUT_DIR)."
+          }
+
+          $msixPath = Get-ChildItem `
+              -Path $packageLayout `
+              -Filter *.msix `
+            | Sort-Object LastWriteTime -Descending `
+            | Select-Object -First 1 -ExpandProperty FullName
+          if (-not (Test-Path $msixPath)) {
+              throw "Expected packaged MSIX at $msixPath."
+          }
+
+          $extractRoot = Join-Path $env:RUNNER_TEMP 'copilot-profile-manager-pr-msix'
+          Remove-Item -Recurse -Force $extractRoot -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $extractRoot | Out-Null
+
+          $zipPath = Join-Path $extractRoot 'package.zip'
+          Copy-Item $msixPath $zipPath
+          Expand-Archive -Path $zipPath -DestinationPath (Join-Path $extractRoot 'expanded')
+
+          $manifestPath = Join-Path (Join-Path $extractRoot 'expanded') 'AppxManifest.xml'
+          [xml]$manifest = Get-Content -Raw -Path $manifestPath
+          $namespaceManager = New-Object System.Xml.XmlNamespaceManager($manifest.NameTable)
+          $namespaceManager.AddNamespace('pkg', 'http://schemas.microsoft.com/appx/manifest/foundation/windows10')
+          $namespaceManager.AddNamespace('com', 'http://schemas.microsoft.com/appx/manifest/com/windows10')
+          $namespaceManager.AddNamespace('desktop4', 'http://schemas.microsoft.com/appx/manifest/desktop/windows10/4')
+          $namespaceManager.AddNamespace('desktop5', 'http://schemas.microsoft.com/appx/manifest/desktop/windows10/5')
+
+          if ($manifest.Package.Identity.Version -ne $env:PACKAGE_VERSION) {
+              throw "Packaged manifest version '$($manifest.Package.Identity.Version)' did not match expected version '$($env:PACKAGE_VERSION)'."
+          }
+
+          $classRegistration = $manifest.SelectSingleNode('/pkg:Package/pkg:Applications/pkg:Application/pkg:Extensions/com:Extension[@Category="windows.comServer"]/com:ComServer/com:SurrogateServer/com:Class', $namespaceManager)
+          if ($null -eq $classRegistration) {
+              throw 'Packaged manifest does not contain the shell extension com:SurrogateServer registration.'
+          }
+
+          if ($classRegistration.GetAttribute('Path') -ne 'Shell\CopilotProfileManager.Shell.dll') {
+              throw "Packaged manifest registered unexpected shell DLL path '$($classRegistration.GetAttribute('Path'))'."
+          }
+
+          $rootClsid = '3AE4F373-B68B-470D-9A11-1814A6A595E1'
+          $verbs = $manifest.SelectNodes('/pkg:Package/pkg:Applications/pkg:Application/pkg:Extensions/desktop4:Extension[@Category="windows.fileExplorerContextMenus"]/desktop4:FileExplorerContextMenus/desktop5:ItemType/desktop5:Verb', $namespaceManager)
+          if ($null -eq $verbs -or $verbs.Count -ne 2) {
+              throw 'Packaged manifest should register exactly two File Explorer context-menu item types.'
+          }
+
+          $itemTypes = $manifest.SelectNodes('/pkg:Package/pkg:Applications/pkg:Application/pkg:Extensions/desktop4:Extension[@Category="windows.fileExplorerContextMenus"]/desktop4:FileExplorerContextMenus/desktop5:ItemType', $namespaceManager)
+          $registeredTypes = @($itemTypes | ForEach-Object { $_.GetAttribute('Type') })
+          foreach ($expectedType in @('Directory', 'Directory\Background')) {
+              if ($expectedType -notin $registeredTypes) {
+                  throw "Packaged manifest is missing File Explorer item type '$expectedType'."
+              }
+          }
+
+          foreach ($verb in $verbs) {
+              if ($verb.GetAttribute('Clsid') -ne $rootClsid) {
+                  throw "Packaged manifest registered unexpected shell CLSID '$($verb.GetAttribute('Clsid'))'."
+              }
+          }
+
+          $shellDllPath = Join-Path (Join-Path $extractRoot 'expanded') 'Shell\CopilotProfileManager.Shell.dll'
+          if (-not (Test-Path $shellDllPath)) {
+              throw "Packaged MSIX is missing $shellDllPath."
+          }
+
+          "PACKAGE_LAYOUT_PATH=$packageLayout" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CopilotProfileManager-win-x64-msix-test-layout-${{ env.PACKAGE_VERSION }}
+          path: ${{ env.PACKAGE_LAYOUT_PATH }}
+          if-no-files-found: error

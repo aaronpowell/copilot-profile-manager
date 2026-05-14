@@ -4,20 +4,23 @@
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+  xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   xmlns:systemai="http://schemas.microsoft.com/appx/manifest/systemai/windows10"
-  IgnorableNamespaces="uap rescap systemai">
+  IgnorableNamespaces="uap com desktop4 desktop5 rescap systemai">
 
   <Identity
     Name="A1E9E405-003A-4865-99F9-1EAFACAD4AFF"
-    Publisher="CN=AppPublisher"
-    Version="1.0.0.0" />
+    Publisher="CN=CopilotProfileManager"
+    Version="0.2.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="A1E9E405-003A-4865-99F9-1EAFACAD4AFF" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
     <DisplayName>CopilotProfileManager.WinUI</DisplayName>
-    <PublisherDisplayName>AppPublisher</PublisherDisplayName>
+    <PublisherDisplayName>Copilot Profile Manager</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
