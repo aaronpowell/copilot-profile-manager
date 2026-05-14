@@ -39,7 +39,7 @@ public sealed class RegistrySyncService
 
         rootKey.SetValue("MUIVerb", "Copilot");
         rootKey.SetValue("SubCommands", string.Empty);
-        rootKey.SetValue("Icon", ResolveExplorerIcon(profiles[0]));
+        rootKey.SetValue("Icon", ExplorerShellCommandBuilder.ResolveExplorerIcon(profiles[0]));
 
         using var shellKey = rootKey.CreateSubKey("shell");
         ArgumentNullException.ThrowIfNull(shellKey);
@@ -50,34 +50,11 @@ public sealed class RegistrySyncService
             ArgumentNullException.ThrowIfNull(profileKey);
 
             profileKey.SetValue("MUIVerb", profile.Name);
-            profileKey.SetValue("Icon", ResolveExplorerIcon(profile));
+            profileKey.SetValue("Icon", ExplorerShellCommandBuilder.ResolveExplorerIcon(profile));
 
             using var commandKey = profileKey.CreateSubKey("command");
             ArgumentNullException.ThrowIfNull(commandKey);
-            commandKey.SetValue(string.Empty, BuildCommand(profile, directoryToken));
+            commandKey.SetValue(string.Empty, ExplorerShellCommandBuilder.BuildWindowsTerminalCommand(profile, directoryToken));
         }
-    }
-
-    private static string BuildCommand(CopilotProfile profile, string directoryToken) =>
-        $"wt.exe --profile \"{profile.Guid:B}\" -d \"{directoryToken}\"";
-
-    private static string ResolveExplorerIcon(CopilotProfile profile)
-    {
-        if (!string.IsNullOrWhiteSpace(profile.IconPath))
-        {
-            var iconPath = profile.IconPath.Trim();
-            if (Path.GetExtension(iconPath).Equals(".ico", StringComparison.OrdinalIgnoreCase))
-            {
-                return iconPath;
-            }
-
-            var icoPath = Path.ChangeExtension(iconPath, ".ico");
-            if (File.Exists(icoPath))
-            {
-                return icoPath;
-            }
-        }
-
-        return "wt.exe";
     }
 }

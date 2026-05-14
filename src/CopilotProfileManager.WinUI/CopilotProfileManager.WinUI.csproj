@@ -15,6 +15,15 @@
     <EnableMsixTooling>true</EnableMsixTooling>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AppxManifest>Package.appxmanifest</AppxManifest>
+    <ShellExtensionDllName>CopilotProfileManager.Shell.dll</ShellExtensionDllName>
+    <ShellExtensionArtifactPath Condition="'$(ShellExtensionArtifactPath)' == ''">$(MSBuildThisFileDirectory)..\CopilotProfileManager.Shell\bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\publish\$(ShellExtensionDllName)</ShellExtensionArtifactPath>
+    <ShellExtensionArtifactDirectory>$([System.IO.Path]::GetDirectoryName('$(ShellExtensionArtifactPath)'))</ShellExtensionArtifactDirectory>
+    <ShellExtensionPackagePath Condition="'$(ShellExtensionPackagePath)' == ''">Shell\$(ShellExtensionDllName)</ShellExtensionPackagePath>
+    <ShellExtensionRootClsid>3AE4F373-B68B-470D-9A11-1814A6A595E1</ShellExtensionRootClsid>
+    <PackageManifestVersion Condition="'$(PackageManifestVersion)' == ''"></PackageManifestVersion>
+    <IncludeShellExtensionManifest>false</IncludeShellExtensionManifest>
+    <IncludeShellExtensionManifest Condition="Exists('$(ShellExtensionArtifactPath)')">true</IncludeShellExtensionManifest>
   </PropertyGroup>
 
   <ItemGroup>
@@ -60,6 +69,18 @@
     </PackageReference>
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\CopilotProfileManager.Core\CopilotProfileManager.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(IncludeShellExtensionManifest)' == 'true'">
+    <Content Include="$(ShellExtensionArtifactDirectory)\**\*">
+      <Link>Shell\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <PackagePath>Shell\%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <!--
     Defining the "HasPackageAndPublishMenuAddedByProject" property here allows the Solution
     Explorer "Package and Publish" context menu entry to be enabled for this project even if
@@ -73,4 +94,11 @@
     <PublishReadyToRun>false</PublishReadyToRun>
     <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
+
+  <Target Name="InjectShellExtensionsIntoFinalManifest"
+          AfterTargets="AfterGenerateAppxManifest"
+          Condition="'$(IncludeShellExtensionManifest)' == 'true' and Exists('$(FinalAppxManifestName)')">
+    <Exec
+      Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)Generate-PackageManifest.ps1&quot; -TemplatePath &quot;$(FinalAppxManifestName)&quot; -OutputPath &quot;$(FinalAppxManifestName)&quot; -ShellDllPackagePath &quot;$(ShellExtensionPackagePath)&quot; -RootClsid &quot;$(ShellExtensionRootClsid)&quot; -PackageVersion &quot;$(PackageManifestVersion)&quot; -IncludeShellExtension &quot;$(IncludeShellExtensionManifest)&quot;" />
+  </Target>
 </Project>
