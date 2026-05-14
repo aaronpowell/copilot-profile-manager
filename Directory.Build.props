@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <AppVersion Condition="'$(AppVersion)' == ''">0.2.0.0</AppVersion>
+    <AppVersion Condition="'$(AppVersion)' == ''">0.3.0.0</AppVersion>
     <Version Condition="'$(Version)' == ''">$(AppVersion)</Version>
     <FileVersion Condition="'$(FileVersion)' == ''">$(AppVersion)</FileVersion>
     <AssemblyVersion Condition="'$(AssemblyVersion)' == ''">$(AppVersion)</AssemblyVersion>

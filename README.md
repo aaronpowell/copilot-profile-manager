@@ -133,10 +133,10 @@ dotnet publish .\src\CopilotProfileManager.WinUI\CopilotProfileManager.WinUI.csp
 ## Bump version
 
 ```powershell
-.\bump-version.ps1 0.2.0
+.\bump-version.ps1 0.3.0
 ```
 
-This updates both `Directory.Build.props` and `src\CopilotProfileManager.WinUI\Package.appxmanifest`, normalizing three-part versions like `0.2.0` to `0.2.0.0`.
+This updates both `Directory.Build.props` and `src\CopilotProfileManager.WinUI\Package.appxmanifest`, normalizing three-part versions like `0.3.0` to `0.3.0.0`.
 
 ## Roadmap ideas
 
