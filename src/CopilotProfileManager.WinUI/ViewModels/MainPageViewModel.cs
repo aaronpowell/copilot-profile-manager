@@ -1,19 +1,19 @@
 using System.Collections.ObjectModel;
-using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CopilotProfileManager.App.Models;
 using CopilotProfileManager.App.Services;
+using Microsoft.UI.Dispatching;
 
 namespace CopilotProfileManager.WinUI.ViewModels;
 
 public partial class MainPageViewModel : ObservableObject
 {
+    private readonly AppLogService appLogService = AppLogService.Instance;
+    private readonly DispatcherQueue dispatcherQueue = DispatcherQueue.GetForCurrentThread();
     private readonly AppMetadataService metadataService = new();
     private readonly WindowsTerminalSettingsService terminalSettingsService = new();
     private readonly RegistrySyncService registrySyncService = new();
-    private readonly CopilotCliService copilotCliService = new();
-
     private ProfileMetadata metadata = new();
     private List<TerminalSettingsLocation> locations = [];
     private HashSet<Guid> deletedProfileGuids = [];
@@ -89,6 +89,9 @@ public partial class MainPageViewModel : ObservableObject
     public partial string ActivityLog { get; set; } = string.Empty;
 
     [ObservableProperty]
+    public partial string LogFilePath { get; set; } = string.Empty;
+
+    [ObservableProperty]
     public partial string StableSettingsPath { get; set; } = string.Empty;
 
     [ObservableProperty]
@@ -103,6 +106,13 @@ public partial class MainPageViewModel : ObservableObject
     [ObservableProperty]
     public partial string ExplorerIntegrationDescription { get; set; } =
         "Adds or removes the classic Explorer submenu for folders and folder backgrounds. On Windows 11 it appears under Show more options.";
+
+    public MainPageViewModel()
+    {
+        appLogService.LogChanged += OnAppLogChanged;
+        ActivityLog = appLogService.GetBufferedLog();
+        LogFilePath = appLogService.LogFilePath;
+    }
 
     public async Task LoadAsync()
     {
@@ -312,7 +322,7 @@ public partial class MainPageViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ClearActivityLog() => ActivityLog = string.Empty;
+    private void ClearActivityLog() => appLogService.ClearBuffer();
 
     [RelayCommand]
     private async Task SaveAsync()
@@ -336,7 +346,6 @@ public partial class MainPageViewModel : ObservableObject
                 };
 
                 terminalSettingsService.SyncProfiles(location, desiredProfiles, managedGuids);
-                Log($"Synced {desiredProfiles.Count} profile(s) to {location.DisplayName}.");
             }
 
             if (RuntimeEnvironmentService.HasPackageIdentity())
@@ -344,15 +353,7 @@ public partial class MainPageViewModel : ObservableObject
                 Log("Detected package identity before Explorer sync. Registry writes will be virtualized and won't show up in the real Explorer menu or the standard HKCU\\Software\\Classes view.");
             }
 
-            try
-            {
-                registrySyncService.SyncProfiles(Profiles);
-            }
-            catch (Exception ex)
-            {
-                Log($"Explorer registry sync failed: {ex.GetType().Name}: {ex.Message}");
-                throw;
-            }
+            registrySyncService.SyncProfiles(Profiles);
 
             Log(Profiles.Any(profile => profile.SyncRegistry)
                 ? "Updated Explorer registry menu."
@@ -475,13 +476,17 @@ public partial class MainPageViewModel : ObservableObject
 
     private void Log(string message)
     {
-        var builder = new StringBuilder(ActivityLog);
-        if (builder.Length > 0)
+        appLogService.Write("MainPage", message);
+    }
+
+    private void OnAppLogChanged(object? sender, EventArgs e)
+    {
+        if (dispatcherQueue.HasThreadAccess)
         {
-            builder.AppendLine();
+            ActivityLog = appLogService.GetBufferedLog();
+            return;
         }
 
-        builder.Append($"[{DateTime.Now:HH:mm:ss}] {message}");
-        ActivityLog = builder.ToString();
+        dispatcherQueue.TryEnqueue(() => ActivityLog = appLogService.GetBufferedLog());
     }
 }

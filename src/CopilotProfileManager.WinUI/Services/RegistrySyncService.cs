@@ -7,6 +7,7 @@ public sealed class RegistrySyncService
 {
     private const string DirectoryMenuKey = @"Software\Classes\Directory\shell\CopilotProfileManager";
     private const string BackgroundMenuKey = @"Software\Classes\Directory\Background\shell\CopilotProfileManager";
+    private readonly AppLogService appLogService = AppLogService.Instance;
 
     public void SyncProfiles(IEnumerable<CopilotProfile> profiles)
     {
@@ -15,25 +16,31 @@ public sealed class RegistrySyncService
             .OrderBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        appLogService.Write("Registry", $"Starting Explorer menu sync with {orderedProfiles.Count} profile(s).");
         RemoveMenu();
 
         if (orderedProfiles.Count == 0)
         {
+            appLogService.Write("Registry", "No profiles are marked for Explorer sync. Existing Explorer menu entries were removed.");
             return;
         }
 
         CreateMenu(DirectoryMenuKey, orderedProfiles, "%1");
         CreateMenu(BackgroundMenuKey, orderedProfiles, "%V");
+        appLogService.Write("Registry", $"Finished Explorer menu sync with {orderedProfiles.Count} profile(s).");
     }
 
     public void RemoveMenu()
     {
+        appLogService.Write("Registry", $"Removing Explorer menu key '{DirectoryMenuKey}'.");
         Registry.CurrentUser.DeleteSubKeyTree(DirectoryMenuKey, false);
+        appLogService.Write("Registry", $"Removing Explorer menu key '{BackgroundMenuKey}'.");
         Registry.CurrentUser.DeleteSubKeyTree(BackgroundMenuKey, false);
     }
 
-    private static void CreateMenu(string rootKeyPath, IReadOnlyList<CopilotProfile> profiles, string directoryToken)
+    private void CreateMenu(string rootKeyPath, IReadOnlyList<CopilotProfile> profiles, string directoryToken)
     {
+        appLogService.Write("Registry", $"Creating Explorer menu root '{rootKeyPath}' for token '{directoryToken}'.");
         using var rootKey = Registry.CurrentUser.CreateSubKey(rootKeyPath);
         ArgumentNullException.ThrowIfNull(rootKey);
 
@@ -54,7 +61,9 @@ public sealed class RegistrySyncService
 
             using var commandKey = profileKey.CreateSubKey("command");
             ArgumentNullException.ThrowIfNull(commandKey);
-            commandKey.SetValue(string.Empty, BuildCommand(profile, directoryToken));
+            var command = BuildCommand(profile, directoryToken);
+            commandKey.SetValue(string.Empty, command);
+            appLogService.Write("Registry", $"Registered profile '{profile.Name}' ({profile.Guid:B}) with command '{command}'.");
         }
     }
 

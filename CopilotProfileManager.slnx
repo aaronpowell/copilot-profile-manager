@@ -1,7 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/CopilotProfileManager.WinUI/CopilotProfileManager.WinUI.csproj">
-      <Platform Project="x86" />
+      <Platform Project="x64" />
     </Project>
   </Folder>
 </Solution>

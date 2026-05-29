@@ -19,6 +19,7 @@ public sealed class WindowsTerminalSettingsService
     };
 
     private static readonly Regex CopilotRegex = new(@"\bcopilot\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private readonly AppLogService appLogService = AppLogService.Instance;
 
     public IReadOnlyList<TerminalSettingsLocation> DiscoverLocations()
     {
@@ -38,20 +39,31 @@ public sealed class WindowsTerminalSettingsService
             "LocalState",
             "settings.json");
 
-        return
+        TerminalSettingsLocation[] locations =
         [
             new TerminalSettingsLocation("stable", "Windows Terminal", stablePath, File.Exists(stablePath)),
             new TerminalSettingsLocation("preview", "Windows Terminal Preview", previewPath, File.Exists(previewPath)),
         ];
+
+        foreach (var location in locations)
+        {
+            appLogService.Write(
+                "Terminal",
+                $"{location.DisplayName}: {(location.IsInstalled ? "found" : "not found")} settings at '{location.SettingsPath}'.");
+        }
+
+        return locations;
     }
 
     public TerminalSettingsSnapshot LoadSnapshot(TerminalSettingsLocation location)
     {
         if (!location.IsInstalled)
         {
+            appLogService.Write("Terminal", $"Skipping snapshot load for {location.DisplayName} because '{location.SettingsPath}' was not found.");
             return new TerminalSettingsSnapshot(location, [], []);
         }
 
+        appLogService.Write("Terminal", $"Loading settings snapshot from '{location.SettingsPath}'.");
         var root = LoadDocument(location.SettingsPath);
         var profiles = new List<CopilotProfile>();
 
@@ -66,6 +78,7 @@ public sealed class WindowsTerminalSettingsService
         }
 
         var colorSchemes = GetColorSchemes(root);
+        appLogService.Write("Terminal", $"Loaded {profiles.Count} Copilot profile(s) and {colorSchemes.Count} color scheme(s) from {location.DisplayName}.");
         return new TerminalSettingsSnapshot(location, profiles, colorSchemes);
     }
 
@@ -76,6 +89,7 @@ public sealed class WindowsTerminalSettingsService
     {
         if (!location.IsInstalled)
         {
+            appLogService.Write("Terminal", $"Skipping sync for {location.DisplayName} because '{location.SettingsPath}' was not found.");
             return;
         }
 
@@ -85,6 +99,13 @@ public sealed class WindowsTerminalSettingsService
         var managedGuidSet = managedProfileGuids
             .Select(NormalizeGuid)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var removedCount = 0;
+        var createdCount = 0;
+        var updatedCount = 0;
+
+        appLogService.Write(
+            "Terminal",
+            $"Syncing {desiredByGuid.Count} desired profile(s) into {location.DisplayName} settings at '{location.SettingsPath}'.");
 
         for (var i = profilesArray.Count - 1; i >= 0; i--)
         {
@@ -102,6 +123,7 @@ public sealed class WindowsTerminalSettingsService
             if (managedGuidSet.Contains(guid) && !desiredByGuid.ContainsKey(guid))
             {
                 profilesArray.RemoveAt(i);
+                removedCount++;
             }
         }
 
@@ -115,12 +137,20 @@ public sealed class WindowsTerminalSettingsService
             {
                 existing = new JsonObject();
                 profilesArray.Add(existing);
+                createdCount++;
+            }
+            else
+            {
+                updatedCount++;
             }
 
             ApplyProfile(existing, entry.Value);
         }
 
         SaveDocument(location.SettingsPath, root);
+        appLogService.Write(
+            "Terminal",
+            $"Saved {location.DisplayName} settings. Created {createdCount}, updated {updatedCount}, removed {removedCount} managed profile(s).");
     }
 
     public string DetermineDefaultShellPrefix(IEnumerable<CopilotProfile> profiles)

@@ -10,6 +10,7 @@ public sealed class AppMetadataService
         WriteIndented = true,
     };
 
+    private readonly AppLogService appLogService = AppLogService.Instance;
     private readonly string metadataPath;
 
     public AppMetadataService()
@@ -25,16 +26,20 @@ public sealed class AppMetadataService
     {
         if (!File.Exists(metadataPath))
         {
+            appLogService.Write("Metadata", $"No metadata file found at '{metadataPath}'. Starting with an empty managed profile set.");
             return new ProfileMetadata();
         }
 
         var json = File.ReadAllText(metadataPath);
-        return JsonSerializer.Deserialize<ProfileMetadata>(json, JsonOptions) ?? new ProfileMetadata();
+        var metadata = JsonSerializer.Deserialize<ProfileMetadata>(json, JsonOptions) ?? new ProfileMetadata();
+        appLogService.Write("Metadata", $"Loaded {metadata.ManagedProfileGuids.Count} managed profile GUID(s) from '{metadataPath}'.");
+        return metadata;
     }
 
     public void Save(ProfileMetadata metadata)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(metadataPath)!);
         File.WriteAllText(metadataPath, JsonSerializer.Serialize(metadata, JsonOptions));
+        appLogService.Write("Metadata", $"Saved {metadata.ManagedProfileGuids.Count} managed profile GUID(s) to '{metadataPath}'.");
     }
 }
