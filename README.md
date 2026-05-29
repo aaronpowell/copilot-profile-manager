@@ -50,8 +50,8 @@ F# would still be a fun option for the domain layer, but the current app is buil
 
 This MVP writes classic registry-backed context menu entries under:
 
-- `HKCU\Software\Classes\Directory\shell\CopilotProfileManager`
-- `HKCU\Software\Classes\Directory\Background\shell\CopilotProfileManager`
+- `HKCU\Software\Classes\Directory\shell\Copilot`
+- `HKCU\Software\Classes\Directory\Background\shell\Copilot`
 
 That means it works without elevation, but on Windows 11 it still lands under **Show more options**.
 

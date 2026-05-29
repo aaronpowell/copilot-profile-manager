@@ -5,8 +5,8 @@ namespace CopilotProfileManager.App.Services;
 
 public sealed class RegistrySyncService
 {
-    private const string DirectoryMenuKey = @"Software\Classes\Directory\shell\CopilotProfileManager";
-    private const string BackgroundMenuKey = @"Software\Classes\Directory\Background\shell\CopilotProfileManager";
+    private const string DirectoryMenuKey = @"Software\Classes\Directory\shell\Copilot";
+    private const string BackgroundMenuKey = @"Software\Classes\Directory\Background\shell\Copilot";
     private readonly AppLogService appLogService = AppLogService.Instance;
 
     public void SyncProfiles(IEnumerable<CopilotProfile> profiles)
@@ -53,7 +53,7 @@ public sealed class RegistrySyncService
 
         foreach (var profile in profiles)
         {
-            using var profileKey = shellKey.CreateSubKey(profile.Guid.ToString("N"));
+            using var profileKey = shellKey.CreateSubKey(GetMenuItemKey(profile));
             ArgumentNullException.ThrowIfNull(profileKey);
 
             profileKey.SetValue("MUIVerb", profile.Name);
@@ -65,6 +65,12 @@ public sealed class RegistrySyncService
             commandKey.SetValue(string.Empty, command);
             appLogService.Write("Registry", $"Registered profile '{profile.Name}' ({profile.Guid:B}) with command '{command}'.");
         }
+    }
+
+    private static string GetMenuItemKey(CopilotProfile profile)
+    {
+        var key = profile.Name.Trim();
+        return string.IsNullOrWhiteSpace(key) ? profile.Guid.ToString("N") : key;
     }
 
     private static string BuildCommand(CopilotProfile profile, string directoryToken) =>
